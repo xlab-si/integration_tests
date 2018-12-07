@@ -340,6 +340,26 @@ class NetworkPortView(BaseLoggedInPage):
                 self.entities.title.text == 'Network Ports')
 
 
+class NetworkEntityWithNetworkPortView(BaseLoggedInPage):
+    """ Represents a network entity with NetworkPorts page """
+    toolbar = View.nested(NetworkPortToolBar)
+    sidebar = View.nested(NetworkPortSideBar)
+    including_entities = View.include(NetworkPortEntities, use_parent=True)
+
+    @property
+    def is_displayed(self):
+        obj = self.context['object']
+        from cfme.networks.subnet import Subnet
+        matched_title = ('{name} (All Network Ports)'.format(
+            name=self.context['object'].name) == self.entities.title.text
+        )
+        if isinstance(obj, Subnet):
+            matched_navigation = self.navigation.currently_selected == ['Networks', 'Subnets']
+        else:
+            matched_navigation = False
+        return super(BaseLoggedInPage, self).is_displayed and matched_navigation and matched_title
+
+
 class NetworkPortDetailsView(BaseLoggedInPage):
     """ Represents detail view of network provider """
     title = Text('//div[@id="main-content"]//h1')
