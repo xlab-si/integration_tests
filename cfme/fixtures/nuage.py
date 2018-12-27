@@ -5,6 +5,17 @@ from cfme.utils.log import logger
 from cfme.utils.wait import wait_for
 
 
+def get_object_from_db_with_timeout(appliance, table_name, object_id):
+    def get_object():
+        logger.info('Looking for %s with ID %s in the VMDB...', table_name, object_id)
+        table = appliance.db.client[table_name]
+        return (appliance.db.client.session.query(table.name)
+                .filter(table.ems_ref == object_id).first())
+
+    obj, _ = wait_for(get_object, num_sec=60, delay=5, fail_condition=None)
+    return obj
+
+
 def create_basic_sandbox(nuage):
     box = {}
 
@@ -65,15 +76,9 @@ def with_nuage_sandbox_modscope(appliance, setup_provider_modscope, provider):
     nuage = provider.mgmt
     sandbox = create_basic_sandbox(nuage)
     enterprise = sandbox['enterprise']
-    logger.info('Performing a full refresh, so sandbox %s appears in the database', enterprise.name)
-    provider.refresh_provider_relationships()
-    wait_for(provider.is_refreshed, func_kwargs=dict(refresh_delta=5), timeout=600, delay=10)
-
     # Check if tenant exists in database, if not fail test immediately
-    tenants_table = appliance.db.client['cloud_tenants']
-    tenant = (appliance.db.client.session
-              .query(tenants_table.name, tenants_table.ems_ref)
-              .filter(tenants_table.ems_ref == enterprise.id).first())
+    tenant = get_object_from_db_with_timeout(appliance, 'cloud_tenants', enterprise.id)
+
     assert tenant is not None, 'Nuage sandbox tenant inventory missing: {}'.format(enterprise.name)
 
     # Let integration test do whatever it needs to do.
